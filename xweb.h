@@ -19,6 +19,8 @@
 #define XWEB__TIMEOUT         (5)
 #define XWEB__BUF_SZ_RESP     (8192)
 #define XWEB__BUF_SZ_REQ      (2047)
+#define XWEB__BUF_SZ_FILE     (1024)
+#define XWEB__SMTP_MAX_RESPONSE (256)
 
 enum  httpHdr_e
 {
@@ -45,12 +47,18 @@ typedef struct XWEB__clientInfo_s
 
 
 
+
+/* http client */
 int         XWEB__HttpParseUrl( char *url, char **hostname, char **port, char **path);
 int         XWEB__HttpSendRequest( socket_t sfd, char *hostname, char *port, char *path);
 int         XWEB__HttpConnectToHost( socket_t *sfd, char *hostname, char *port);
 const char *XWEB__HttpGetContentType( const char *path);
 
 
+
+
+/* http server */
+XWEB__clientInfo_t * XWEB__HttpSvrGetClientsList(void);
 int         XWEB__HttpSvrCreateSock( socket_t *sfd, char *hostname, char *port);
 int         XWEB__HttpSvrGetClient( socket_t sfd, XWEB__clientInfo_t **pClientAddr);
 int         XWEB__HttpSvrDropClient( XWEB__clientInfo_t *pClient);
@@ -58,5 +66,11 @@ const char *XWEB__HttpSvrGetClientAddr( XWEB__clientInfo_t *pClient);
 fd_set      XWEB__HttpSvrWaitOnClients( socket_t srv);
 void        XWEB__HttpSvrSendErr400( XWEB__clientInfo_t *pClient);
 void        XWEB__HttpSvrSendErr404( XWEB__clientInfo_t *pClient);
+void        XWEB__HttpSvrServeResource( XWEB__clientInfo_t *pClient, const char *path);
+
+
+/* smtp - mail */
+void       XWEB__GetInput(const char *prompt, char *buffer);
+
 
 #endif /* XWEB_H */

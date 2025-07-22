@@ -4,6 +4,11 @@
 static XWEB__clientInfo_t *XWEB__pClients = NULL;
 
 
+XWEB__clientInfo_t * XWEB__HttpSvrGetClientsList(void)
+{
+    return (XWEB__pClients);
+}
+
 int XWEB__HttpParseUrl( char *url, char **hostname, char **port, char **path)
 {
     int retCode = 0;
@@ -269,6 +274,7 @@ int XWEB__HttpSvrGetClient( socket_t sfd, XWEB__clientInfo_t **pClientAddr)
     XWEB__clientInfo_t *pNewClient = NULL;
     int retCode = 0;
 
+#if 0
     if (!pClientAddr)
     {
         fprintf(stderr, "Invalid client addr - nullptr \n");
@@ -276,6 +282,7 @@ int XWEB__HttpSvrGetClient( socket_t sfd, XWEB__clientInfo_t **pClientAddr)
         goto labelExit;
 
     }
+#endif
     /* Search for client in the client linked list */
     while( pClient )
     {
@@ -294,7 +301,7 @@ int XWEB__HttpSvrGetClient( socket_t sfd, XWEB__clientInfo_t **pClientAddr)
     }
 
     /* create a new client if not found and add to client list */
-    pNewClient = (XWEB__clientInfo_t *)calloc(1, sizeof(XWEB__clientInfo_t *));
+    pNewClient = (XWEB__clientInfo_t *)calloc(1, sizeof(XWEB__clientInfo_t));
     if (!pNewClient)
     {
         fprintf(stderr, "out of memory\n");
@@ -424,3 +431,190 @@ void XWEB__HttpSvrSendErr404( XWEB__clientInfo_t *pClient)
 
 
 
+
+void XWEB__HttpSvrServeResource( XWEB__clientInfo_t *pClient, const char *path)
+{
+    /*>
+     * note that it is expected that the directory from which files are served
+     * is name public 
+     */
+    char    bufFullPath[128];
+    char   *strDirName = "public";
+    FILE   *pFile = NULL; 
+    size_t  fileSz = 0;
+    const char *contentType = NULL;
+    char        buf[XWEB__BUF_SZ_FILE];
+
+    memset((void *)bufFullPath, 0, 128);
+    printf("server resource: %s %s\n", XWEB__HttpSvrGetClientAddr(pClient), path);
+
+    /* Check that client request for default page index.html */
+    if (strcmp(path, "/") == 0)
+    {
+        path = "/index.html";
+    }
+    /* Check that client request file path is not greater than 100 */
+    if (strlen(path) > 100)
+    {
+        XWEB__HttpSvrSendErr400(pClient);
+        return ;
+    }
+    /* Check that client did not attempt to access parent directory */
+    if (strstr(path, ".."))
+    {
+        XWEB__HttpSvrSendErr404(pClient);
+        return ;
+    }
+
+    /* create the path to find file requested by client's request */
+    sprintf(bufFullPath, "%s%s", strDirName, path);
+
+    /* Check if the file requested by client exist */
+    pFile = fopen(bufFullPath, "rb");
+    if (!pFile)
+    {
+        XWEB__HttpSvrSendErr404(pClient);
+        return ;
+    }
+    /* Determine the size of the file */
+    fseek(pFile, 0L, SEEK_END);
+    fileSz = ftell(pFile);
+    rewind(pFile);
+
+    /* Determine the content type of the file */
+    contentType = XWEB__HttpGetContentType(bufFullPath);
+
+    /* Create response */
+    sprintf(buf, "HTTP/1.1 200 OK\r\n");
+    send(pClient->socket, buf, strlen(buf), 0);
+
+    sprintf(buf, "Connection: close\r\n");
+    send(pClient->socket, buf, strlen(buf), 0);
+    
+    sprintf(buf, "Content-Length: %lu\r\n", fileSz);
+    send(pClient->socket, buf, strlen(buf), 0);
+
+    sprintf(buf, "Content-Type: %s\r\n", contentType);
+    send(pClient->socket, buf, strlen(buf), 0);
+
+    sprintf(buf, "\r\n");
+    send(pClient->socket, buf, strlen(buf), 0);
+
+    int r = fread(buf, 1, XWEB__BUF_SZ_FILE, pFile);
+    while (r)
+    {
+        send(pClient->socket, buf, r, 0);
+        r = fread(buf, 1, XWEB__BUF_SZ_FILE, pFile);
+    }
+    fclose(pFile);
+    XWEB__HttpSvrDropClient(pClient);
+}
+
+
+
+/* Prompt the user for input and retrieve it */
+void  XWEB__GetInput(const char *prompt, char *buffer)
+{
+    printf("%s", prompt);
+    buffer[0] = 0; /* null terminate */
+    fgets(buffer, _PC_MAX_INPUT, stdin);
+    const int readCnt = strlen(buffer);
+
+    if (readCnt > 0)
+    {
+        /* update the null terminaton afterwards */
+        buffer[ readCnt - 1] = 0; 
+    }
+}
+
+
+
+
+void  XWEB__SendFormat(socket_t fdSrv, const char *text, ...)
+{
+    char buf[1024];
+    va_list args;
+    va_start(args, text);
+    vsprintf(buf, text, args);
+    va_end(args);
+
+    send(fdSrv, buf, strlen(buf), 0);
+    printf("C: %s", buf);
+}
+
+
+/* This methods retrieves the response code from the server which is usually 
+ * a 3 digit code at the start of the response string. */
+int  XWEB__StmpParseResponse(const char *response)
+{
+    int retCode = 0;
+
+    const char *r = response;
+    /* Check that these are not null terminator */
+    if (!r[0] || !r[1] || !r[2])
+    {
+        goto labelExit;
+    }
+
+    for (; r[3]; r++)
+    {
+        if (r == response || r[-1] == '\n')
+        {
+            if (isdigit(r[0]) && isdigit(r[1]) && isdigit(r[2]))
+            {
+                if (r[3] != '-')
+                {
+                    if (strstr(r, "\r\n"))
+                    {
+                        retCode = strtol(r, 0, 10);
+                    }
+                }
+            }
+        }
+    }
+
+labelExit:
+    return (retCode);
+}
+
+
+
+/* This function polls until a desired response is received from 
+ * stmp server */
+void  XWEB__StmpWaitOnResp(socket_t fdSrv, int expectedCode)
+{
+    char resp[ XWEB__SMTP_MAX_RESPONSE + 1 ];
+    char *p = resp;
+    char *end = resp + XWEB__SMTP_MAX_RESPONSE;
+    int code = 0;
+    int bytesRecvd = 0;
+
+    do
+    {
+        bytesRecvd = recv(fdSrv, p, end-p, 0);
+        if (bytesRecvd < 1)
+        {
+            fprintf(stderr, "Connection dropped.\n");
+            exit(1);
+        }
+        p += bytesRecvd;
+
+        if ( p >= end)
+        {
+            fprintf(stderr, "Server response is too large:\n");
+            fprintf(stderr, "%s", resp);
+            exit(2);
+        }
+
+        *p = 0; /* Null terminate the received response */
+        code = XWEB__StmpParseResponse(resp);
+    }
+    while ( code == 0 );
+
+    if (code != expectedCode)
+    {
+        fprintf(stderr, "Error from server:\n");
+        fprintf(stderr, "%s", resp);
+        exit(3);
+    }
+}
