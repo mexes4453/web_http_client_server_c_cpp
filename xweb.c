@@ -517,7 +517,7 @@ void  XWEB__GetInput(const char *prompt, char *buffer)
 {
     printf("%s", prompt);
     buffer[0] = 0; /* null terminate */
-    fgets(buffer, _PC_MAX_INPUT, stdin);
+    fgets(buffer, XWEB__MAX_INPUT, stdin);
     const int readCnt = strlen(buffer);
 
     if (readCnt > 0)
@@ -543,7 +543,8 @@ void  XWEB__SendFormat(socket_t fdSrv, const char *text, ...)
 }
 
 
-/* This methods retrieves the response code from the server which is usually 
+/*>
+ * This methods retrieves the response code from the server which is usually 
  * a 3 digit code at the start of the response string. */
 int  XWEB__StmpParseResponse(const char *response)
 {
@@ -581,7 +582,7 @@ labelExit:
 
 /* This function polls until a desired response is received from 
  * stmp server */
-void  XWEB__StmpWaitOnResp(socket_t fdSrv, int expectedCode)
+void  XWEB__SmtpWaitOnResp(socket_t fdSrv, int expectedCode)
 {
     char resp[ XWEB__SMTP_MAX_RESPONSE + 1 ];
     char *p = resp;
@@ -617,4 +618,5 @@ void  XWEB__StmpWaitOnResp(socket_t fdSrv, int expectedCode)
         fprintf(stderr, "%s", resp);
         exit(3);
     }
+    printf("S: %s", resp);
 }

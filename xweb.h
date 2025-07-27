@@ -12,15 +12,19 @@
 # include <time.h>
 # include <arpa/inet.h>
 # include <errno.h>
+# include <stdarg.h>
+# include <ctype.h>
 
-#define XWEB__PROTO_DELIMITER "://"
-#define XWEB__CHAR_NULL       '\0'
-#define XWEB__PROTO_HTTP      "http"
-#define XWEB__TIMEOUT         (5)
-#define XWEB__BUF_SZ_RESP     (8192)
-#define XWEB__BUF_SZ_REQ      (2047)
-#define XWEB__BUF_SZ_FILE     (1024)
+#define XWEB__PROTO_DELIMITER   "://"
+#define XWEB__CHAR_NULL         '\0'
+#define XWEB__PROTO_HTTP        "http"
+#define XWEB__TIMEOUT           (5)
+#define XWEB__BUF_SZ_RESP       (8192)
+#define XWEB__BUF_SZ_REQ        (2047)
+#define XWEB__BUF_SZ_FILE       (1024)
 #define XWEB__SMTP_MAX_RESPONSE (256)
+#define XWEB__MAX_INPUT         (512)
+
 
 enum  httpHdr_e
 {
@@ -70,7 +74,10 @@ void        XWEB__HttpSvrServeResource( XWEB__clientInfo_t *pClient, const char 
 
 
 /* smtp - mail */
-void       XWEB__GetInput(const char *prompt, char *buffer);
+void       XWEB__GetInput( const char *prompt, char *buffer);
+void       XWEB__SmtpWaitOnResp( socket_t fdSrv, int expectedCode);
+void       XWEB__SendFormat( socket_t fdSrv, const char *text, ...);
+int        XWEB__StmpParseResponse( const char *response);
 
 
 #endif /* XWEB_H */
