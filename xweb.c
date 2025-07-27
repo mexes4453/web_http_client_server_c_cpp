@@ -620,3 +620,22 @@ void  XWEB__SmtpWaitOnResp(socket_t fdSrv, int expectedCode)
     }
     printf("S: %s", resp);
 }
+
+
+
+
+void XWEB__HttpsTxRequest( SSL *ssl, char *hostname, char *port, char *path)
+{
+    char buffer [2048];
+
+    memset((void *)buffer, 0, 2048);
+    sprintf(buffer, "GET /%s HTTP/1.1\r\n", path);
+    sprintf(buffer + strlen(buffer), "Host: %s:%s\r\n", hostname, port);
+    sprintf(buffer + strlen(buffer), "Connection: close\r\n");
+    sprintf(buffer + strlen(buffer), "User-Agent: honpwc xweb 1.0\r\n");
+    sprintf(buffer + strlen(buffer), "\r\n");
+
+    SSL_write(ssl, buffer, strlen(buffer));
+    printf ("Sent Headers:\n%s", buffer);
+    return;
+}

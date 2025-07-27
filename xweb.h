@@ -14,6 +14,8 @@
 # include <errno.h>
 # include <stdarg.h>
 # include <ctype.h>
+# include <openssl/ssl.h> //sudo apt install libssl-dev
+# include <openssl/err.h>
 
 #define XWEB__PROTO_DELIMITER   "://"
 #define XWEB__CHAR_NULL         '\0'
@@ -24,7 +26,12 @@
 #define XWEB__BUF_SZ_FILE       (1024)
 #define XWEB__SMTP_MAX_RESPONSE (256)
 #define XWEB__MAX_INPUT         (512)
-
+# define XWEB__ERR(errMsg, errCode, pErrCodeVar, label) \
+{\
+    fprintf(stderr, errMsg); \
+    (*(pErrCodeVar)) = errCode; \
+    goto label; \
+}
 
 enum  httpHdr_e
 {
@@ -71,6 +78,7 @@ fd_set      XWEB__HttpSvrWaitOnClients( socket_t srv);
 void        XWEB__HttpSvrSendErr400( XWEB__clientInfo_t *pClient);
 void        XWEB__HttpSvrSendErr404( XWEB__clientInfo_t *pClient);
 void        XWEB__HttpSvrServeResource( XWEB__clientInfo_t *pClient, const char *path);
+void        XWEB__HttpsTxRequest( SSL *ssl, char *hostname, char *port, char *path);
 
 
 /* smtp - mail */
